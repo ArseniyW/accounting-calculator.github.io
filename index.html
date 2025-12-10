@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Умный калькулятор бухгалтерии</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --text: #1e293b;
+            --border: #e2e8f0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            padding: 20px;
+            margin: 0;
+        }
+
+        .container {
+            background: var(--card);
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            max-width: 500px;
+            width: 100%;
+        }
+
+        h2 { margin-top: 0; text-align: center; color: var(--primary); }
+        
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px; }
+        
+        select, input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 16px;
+            box-sizing: border-box; /* Важно для отступов */
+        }
+
+        .checkbox-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            background: #f1f5f9;
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+        }
+
+        input[type="checkbox"] { transform: scale(1.2); }
+
+        /* Блок с результатами */
+        .results {
+            margin-top: 30px;
+            border-top: 2px solid var(--border);
+            padding-top: 20px;
+        }
+
+        .price-card {
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .price-card.min { background: #f3f4f6; color: #64748b; border: 1px solid #cbd5e1; }
+        .price-card.comfort { background: #dcfce7; color: #166534; border: 1px solid #86efac; transform: scale(1.02); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .price-card.max { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+
+        .price-label { font-size: 14px; font-weight: 600; }
+        .price-value { font-size: 20px; font-weight: 700; }
+        
+        .hint { font-size: 12px; opacity: 0.7; font-weight: normal;}
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>🧮 Калькулятор услуг</h2>
+
+    <div class="form-group">
+        <label>Режим налогообложения</label>
+        <select id="taxMode">
+            <option value="usn6">УСН 6% (Доходы)</option>
+            <option value="usn15">УСН 15% (Д-Р)</option>
+            <option value="osno">ОСНО (НДС)</option>
+            <option value="patent">Патент / Самозанятые</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label>Количество документов в месяц</label>
+        <input type="number" id="docs" value="0" min="0">
+    </div>
+
+    <div class="form-group">
+        <label>Количество сотрудников</label>
+        <input type="number" id="staff" value="0" min="0">
+    </div>
+
+    <div class="form-group">
+        <label>Количество банков (расчетных счетов)</label>
+        <input type="number" id="banks" value="1" min="1">
+    </div>
+
+    <div class="form-group">
+        <label>Дополнительные услуги</label>
+        <div class="checkbox-group">
+            <label class="checkbox-item">
+                <input type="checkbox" id="isVed"> ВЭД (Импорт/Экспорт)
+            </label>
+            <label class="checkbox-item">
+                <input type="checkbox" id="isMarketplace"> Маркетплейсы
+            </label>
+            <label class="checkbox-item">
+                <input type="checkbox" id="isCustoms"> Таможня / Валютный контроль
+            </label>
+        </div>
+    </div>
+
+    <div class="results">
+        <div class="price-card min">
+            <div>
+                <div class="price-label">Минимум</div>
+                <div class="hint">Для стартапов</div>
+            </div>
+            <div class="price-value" id="resMin">0 ₽</div>
+        </div>
+
+        <div class="price-card comfort">
+            <div>
+                <div class="price-label">🔥 Комфорт</div>
+                <div class="hint">Рекомендуемая цена</div>
+            </div>
+            <div class="price-value" id="resComfort">0 ₽</div>
+        </div>
+
+        <div class="price-card max">
+            <div>
+                <div class="price-label">Перегруз</div>
+                <div class="hint">Сложные клиенты</div>
+            </div>
+            <div class="price-value" id="resMax">0 ₽</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // === НАСТРОЙКИ ЦЕН (МОЖНО МЕНЯТЬ ТУТ) ===
+    const PRICES = {
+        base: { // Базовая стоимость за "нулевку"
+            usn6: 5000,
+            usn15: 8000,
+            osno: 15000,
+            patent: 3000
+        },
+        perDoc: 100,      // Цена за 1 документ
+        perStaff: 1000,   // Цена за 1 сотрудника
+        perBank: 500,     // Цена за доп. банк (начиная со 2-го)
+        
+        // Коэффициенты (умножение итоговой суммы)
+        k_ved: 1.3,        // +30% за ВЭД
+        k_marketplace: 1.2,// +20% за Маркетплейсы
+        
+        // Фикс за сложные услуги
+        fix_customs: 5000  // +5000 руб за таможню
+    };
+
+    // Элементы
+    const inputs = document.querySelectorAll('input, select');
+    
+    // Функция расчета
+    function calculate() {
+        // 1. Сбор данных
+        const mode = document.getElementById('taxMode').value;
+        const docs = parseInt(document.getElementById('docs').value) || 0;
+        const staff = parseInt(document.getElementById('staff').value) || 0;
+        const banks = parseInt(document.getElementById('banks').value) || 1;
+        
+        const isVed = document.getElementById('isVed').checked;
+        const isMarketplace = document.getElementById('isMarketplace').checked;
+        const isCustoms = document.getElementById('isCustoms').checked;
+
+        // 2. Математика
+        let total = PRICES.base[mode];
+        
+        total += docs * PRICES.perDoc;
+        total += staff * PRICES.perStaff;
+        if (banks > 1) {
+            total += (banks - 1) * PRICES.perBank; // Первый банк входит в базу
+        }
+        
+        // Добавляем фиксы до умножения коэффициентов? Или после?
+        // Обычно сложность накручивается на объем.
+        if (isCustoms) total += PRICES.fix_customs;
+
+        // 3. Коэффициенты
+        let multiplier = 1;
+        if (isVed) multiplier += (PRICES.k_ved - 1);
+        if (isMarketplace) multiplier += (PRICES.k_marketplace - 1);
+        
+        total = total * multiplier;
+
+        // 4. Диапазоны
+        const minPrice = Math.round(total * 0.85); // -15%
+        const comfortPrice = Math.round(total);
+        const maxPrice = Math.round(total * 1.4);  // +40%
+
+        // 5. Вывод (форматирование 10 000 ₽)
+        const formatRub = (num) => new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 }).format(num);
+
+        document.getElementById('resMin').innerText = formatRub(minPrice);
+        document.getElementById('resComfort').innerText = formatRub(comfortPrice);
+        document.getElementById('resMax').innerText = formatRub(maxPrice);
+    }
+
+    // Слушаем изменения во всех полях
+    inputs.forEach(el => el.addEventListener('input', calculate));
+
+    // Первый запуск
+    calculate();
+</script>
+
+</body>
+</html>
